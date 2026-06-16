@@ -28,6 +28,7 @@ jobs:
         run: go build -o rir-sql-forge ./cmd/rir-sql-forge
 
       - name: Compile public RIR database
+        timeout-minutes: 120
         run: ./rir-sql-forge compile --output dist --work-dir tmp/rir-sql-forge
 
       - name: Compress assets
