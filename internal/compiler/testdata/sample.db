@@ -1,0 +1,20 @@
+inetnum: 203.0.113.0 - 203.0.113.255
+org: ORG-SAMPLE-RIPE
+admin-c: TECH-SAMPLE
+
+inetnum: 198.51.100.0 - 198.51.100.255
+tech-c: TECH-SAMPLE
+
+organisation: ORG-SAMPLE-RIPE
+org-name: Sample Networks Ltd
+country: DE
+abuse-c: ABUSE-SAMPLE
+
+role: Abuse Desk
+nic-hdl: ABUSE-SAMPLE
+abuse-mailbox: abuse@example.net
+e-mail: role@example.net
+
+person: Technical Contact
+nic-hdl: TECH-SAMPLE
+e-mail: noc@example.net
