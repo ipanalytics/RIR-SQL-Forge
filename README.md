@@ -2,9 +2,7 @@
 
 RIR-SQL-Forge is a Go utility for building a local IP ownership and abuse-contact directory from public RPSL bulk data. It downloads RIPE, APNIC, and AFRINIC databases automatically, parses the data as streams, resolves organisation/contact relationships, and publishes SQLite, DuckDB, Parquet, and CSV artifacts suitable for security operations, abuse handling, risk systems, and network analytics.
 
-<p align="center">
-  <img src="./site/banner.svg" alt="RIR-SQL-Forge banner" width="100%">
-</p>
+
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
