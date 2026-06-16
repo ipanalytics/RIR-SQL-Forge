@@ -65,6 +65,24 @@ e-mail: noc-apnic@example.net
 	}
 }
 
+func TestParseNetworkDirectAbuseC(t *testing.T) {
+	input := `inetnum: 203.0.113.0 - 203.0.113.255
+abuse-c: ABUSE-DIRECT
+mnt-irt: IRT-SHOULD-NOT-WIN
+tech-c: TECH-SHOULD-NOT-WIN
+`
+	records, err := ParseAll(context.Background(), strings.NewReader(input), "APNIC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records = %d", len(records))
+	}
+	if got := records[0].Networks[0].ContactID; got != "ABUSE-DIRECT" {
+		t.Fatalf("network contact = %q", got)
+	}
+}
+
 func TestGzipStream(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

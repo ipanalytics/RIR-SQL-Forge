@@ -312,6 +312,14 @@ Tracked metrics:
 
 Low coverage is useful signal, not hidden failure. It usually means the upstream registry objects do not expose contacts, the reference points to ARIN/LACNIC material that was not provided, or the registry data is incomplete for that range.
 
+### Latest Published Stats
+
+This block is updated by the release workflow after a successful dataset build.
+
+<!-- DATASET_STATS_START -->
+No published dataset stats have been committed yet. Check the latest GitHub Release for `net_owner_directory.stats.md`.
+<!-- DATASET_STATS_END -->
+
 ---
 
 ## Operational Notes

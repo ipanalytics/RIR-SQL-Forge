@@ -152,7 +152,10 @@ func parseNetworks(objectType string, attrs map[string][]string, rir string) ([]
 		return nil, err
 	}
 
-	contactID := first(attrs, "mnt-irt")
+	contactID := first(attrs, "abuse-c")
+	if contactID == "" {
+		contactID = first(attrs, "mnt-irt")
+	}
 	if contactID == "" {
 		contactID = first(attrs, "admin-c")
 	}
