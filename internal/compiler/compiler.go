@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ipanalytics/rir-sql-forge/internal/artifacts"
 	"github.com/ipanalytics/rir-sql-forge/internal/db"
@@ -66,26 +67,32 @@ func Compile(ctx context.Context, opts Options, log io.Writer) error {
 		return err
 	}
 
-	if err := ingestSources(ctx, store, sourceList); err != nil {
+	if err := ingestSources(ctx, store, sourceList, log); err != nil {
 		return err
 	}
+	fmt.Fprintln(log, "building flat join table")
 	if err := store.Flatten(ctx); err != nil {
 		return err
 	}
+	fmt.Fprintln(log, "exporting CSV")
 	if err := store.ExportCSV(ctx, csvPath); err != nil {
 		return err
 	}
+	fmt.Fprintln(log, "writing dataset saturation stats")
 	stats, err := store.ExportStats(ctx, statsJSONPath, statsMarkdownPath)
 	if err != nil {
 		return err
 	}
+	fmt.Fprintln(log, "loading flat rows for DuckDB and Parquet export")
 	flatRows, err := store.FlatRows(ctx)
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(log, "exporting DuckDB rows=%d\n", len(flatRows))
 	if err := artifacts.ExportDuckDB(ctx, duckdbPath, flatRows); err != nil {
 		return err
 	}
+	fmt.Fprintf(log, "exporting Parquet rows=%d\n", len(flatRows))
 	if err := artifacts.ExportParquet(parquetPath, flatRows); err != nil {
 		return err
 	}
@@ -151,25 +158,33 @@ func prepareSources(ctx context.Context, opts Options, log io.Writer) ([]sources
 	return sourceList, nil
 }
 
-func ingestSources(ctx context.Context, store *db.Store, sourceList []sources.Source) error {
+func ingestSources(ctx context.Context, store *db.Store, sourceList []sources.Source, log io.Writer) error {
 	var networks []parser.Network
 	orgs := map[string]parser.Organisation{}
 	contacts := map[string]parser.Contact{}
 
 	for _, src := range sourceList {
+		started := time.Now()
+		fmt.Fprintf(log, "parsing %s %s from %s\n", src.RIR, sourceLabel(src), src.LocalPath)
 		records, err := parseSource(ctx, src)
 		if err != nil {
 			return fmt.Errorf("%s %s: %w", src.RIR, src.LocalPath, err)
 		}
+		var sourceNetworks, sourceOrgs, sourceContacts int
 		for _, record := range records {
 			networks = append(networks, record.Networks...)
+			sourceNetworks += len(record.Networks)
 			if record.Organisation != nil && record.Organisation.OrgID != "" {
 				orgs[record.Organisation.OrgID] = *record.Organisation
+				sourceOrgs++
 			}
 			if record.Contact != nil && record.Contact.ContactID != "" {
 				contacts[record.Contact.ContactID] = *record.Contact
+				sourceContacts++
 			}
 		}
+		fmt.Fprintf(log, "parsed %s %s: records=%d networks=%d organisations=%d contacts=%d elapsed=%s\n",
+			src.RIR, sourceLabel(src), len(records), sourceNetworks, sourceOrgs, sourceContacts, time.Since(started).Round(time.Second))
 	}
 
 	orgRows := make([]parser.Organisation, 0, len(orgs))
@@ -180,13 +195,26 @@ func ingestSources(ctx context.Context, store *db.Store, sourceList []sources.So
 	for _, contact := range contacts {
 		contactRows = append(contactRows, contact)
 	}
+	fmt.Fprintf(log, "inserting networks rows=%d batch_size=50000\n", len(networks))
 	if err := store.InsertNetworks(ctx, networks, 50000); err != nil {
 		return err
 	}
+	fmt.Fprintf(log, "upserting organisations rows=%d\n", len(orgRows))
 	if err := store.UpsertOrganisations(ctx, orgRows); err != nil {
 		return err
 	}
+	fmt.Fprintf(log, "upserting contacts rows=%d\n", len(contactRows))
 	return store.UpsertContacts(ctx, contactRows)
+}
+
+func sourceLabel(src sources.Source) string {
+	if src.ObjectHint != "" {
+		return src.ObjectHint
+	}
+	if src.UserProvided {
+		return "local"
+	}
+	return "source"
 }
 
 func parseSource(ctx context.Context, src sources.Source) ([]parser.Record, error) {

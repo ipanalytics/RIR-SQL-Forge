@@ -82,6 +82,11 @@ e-mail: noc@example.net
 	if !strings.Contains(string(statsBody), "Email coverage") || !strings.Contains(log.String(), "coverage:") {
 		t.Fatalf("stats report/log missing coverage:\nstats=%s\nlog=%s", string(statsBody), log.String())
 	}
+	for _, wantLog := range []string{"parsing RIPE local", "parsed RIPE local", "inserting networks", "exporting DuckDB", "exporting Parquet"} {
+		if !strings.Contains(log.String(), wantLog) {
+			t.Fatalf("compile log missing %q:\n%s", wantLog, log.String())
+		}
+	}
 	if !strings.Contains(log.String(), "ARIN XML path not provided; skipping ARIN") || !strings.Contains(log.String(), "LACNIC bulk path not provided; skipping LACNIC") {
 		t.Fatalf("manual source skip logs missing:\n%s", log.String())
 	}
