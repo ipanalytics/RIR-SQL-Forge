@@ -35,6 +35,15 @@ jobs:
         run: |
           gzip -c dist/net_owner_directory.sqlite > net_owner_directory.sqlite.gz
           gzip -c dist/net_owner_directory.csv > net_owner_directory.csv.gz
+          gzip -c dist/net_owner_directory.duckdb > net_owner_directory.duckdb.gz
+
+      - name: Build release notes
+        run: |
+          {
+            echo "Automated RIR abuse-contact directory build for db-$(date -u +%F)"
+            echo
+            cat dist/net_owner_directory.stats.md
+          } > release-notes.md
 
       - name: Create release
         env:
@@ -44,10 +53,18 @@ jobs:
           gh release create "$RELEASE_TAG" \
             net_owner_directory.sqlite.gz \
             net_owner_directory.csv.gz \
+            net_owner_directory.duckdb.gz \
+            dist/net_owner_directory.parquet \
+            dist/net_owner_directory.stats.json \
+            dist/net_owner_directory.stats.md \
             --title "$RELEASE_TAG" \
-            --notes "Automated RIR abuse-contact directory build for $RELEASE_TAG" \
+            --notes-file release-notes.md \
             --latest=false \
           || gh release upload "$RELEASE_TAG" \
             net_owner_directory.sqlite.gz \
             net_owner_directory.csv.gz \
+            net_owner_directory.duckdb.gz \
+            dist/net_owner_directory.parquet \
+            dist/net_owner_directory.stats.json \
+            dist/net_owner_directory.stats.md \
             --clobber
