@@ -198,7 +198,7 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 
 	matchRow := s.db.QueryRowContext(ctx, `SELECT
 		COALESCE(SUM(CASE WHEN c1.abuse_email IS NOT NULL AND c1.abuse_email <> '' THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN (c1.abuse_email IS NULL OR c1.abuse_email = '') AND c2.tech_email IS NOT NULL AND c2.tech_email <> '' THEN 1 ELSE 0 END), 0)
+		COALESCE(SUM(CASE WHEN (c1.abuse_email IS NULL OR c1.abuse_email = '') AND ((c2.abuse_email IS NOT NULL AND c2.abuse_email <> '') OR (c2.tech_email IS NOT NULL AND c2.tech_email <> '')) THEN 1 ELSE 0 END), 0)
 	FROM networks n
 	LEFT JOIN organisations o ON n.org_id = o.org_id
 	LEFT JOIN contacts c1 ON o.abuse_contact_id = c1.contact_id
@@ -368,7 +368,7 @@ SELECT
     n.rir,
     o.org_name,
     o.country,
-    COALESCE(c1.abuse_email, c2.tech_email) AS contact_email
+    COALESCE(NULLIF(c1.abuse_email, ''), NULLIF(c2.abuse_email, ''), NULLIF(c2.tech_email, '')) AS contact_email
 FROM networks n
 LEFT JOIN organisations o ON n.org_id = o.org_id
 LEFT JOIN contacts c1 ON o.abuse_contact_id = c1.contact_id

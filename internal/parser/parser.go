@@ -110,9 +110,13 @@ func ParseParagraph(lines []string, rir string) (Record, bool, error) {
 			Country:        strings.ToUpper(first(attrs, "country")),
 			AbuseContactID: first(attrs, "abuse-c"),
 		}
-	case "role", "person":
+	case "role", "person", "irt":
+		contactID := first(attrs, "nic-hdl")
+		if contactID == "" {
+			contactID = first(attrs, "irt")
+		}
 		record.Contact = &Contact{
-			ContactID:  first(attrs, "nic-hdl"),
+			ContactID:  contactID,
 			AbuseEmail: first(attrs, "abuse-mailbox"),
 			TechEmail:  first(attrs, "e-mail"),
 		}
@@ -123,7 +127,7 @@ func ParseParagraph(lines []string, rir string) (Record, bool, error) {
 }
 
 func detectObjectType(attrs map[string][]string) string {
-	for _, key := range []string{"inetnum", "inet6num", "route", "route6", "organisation", "role", "person"} {
+	for _, key := range []string{"inetnum", "inet6num", "route", "route6", "organisation", "role", "person", "irt"} {
 		if _, ok := attrs[key]; ok {
 			return key
 		}
@@ -148,7 +152,10 @@ func parseNetworks(objectType string, attrs map[string][]string, rir string) ([]
 		return nil, err
 	}
 
-	contactID := first(attrs, "admin-c")
+	contactID := first(attrs, "mnt-irt")
+	if contactID == "" {
+		contactID = first(attrs, "admin-c")
+	}
 	if contactID == "" {
 		contactID = first(attrs, "tech-c")
 	}

@@ -29,7 +29,7 @@ func Public(includeRIPE, includeAPNIC, includeAFRINIC bool) []Source {
 			Source{RIR: "APNIC", ObjectHint: "inet6num", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.inet6num.gz", Gzip: true},
 			Source{RIR: "APNIC", ObjectHint: "organisation", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.organisation.gz", Gzip: true},
 			Source{RIR: "APNIC", ObjectHint: "role", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.role.gz", Gzip: true},
-			Source{RIR: "APNIC", ObjectHint: "person", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.person.gz", Gzip: true},
+			Source{RIR: "APNIC", ObjectHint: "irt", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.irt.gz", Gzip: true},
 		)
 	}
 	if includeAFRINIC {

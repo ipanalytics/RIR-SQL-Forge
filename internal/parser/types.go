@@ -16,7 +16,7 @@ type Organisation struct {
 	AbuseContactID string
 }
 
-// Contact is an RPSL role or person object.
+// Contact is an RPSL role, person, or irt object.
 type Contact struct {
 	ContactID  string
 	AbuseEmail string

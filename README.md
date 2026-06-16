@@ -3,7 +3,6 @@
 RIR-SQL-Forge is a Go utility for building a local IP ownership and abuse-contact directory from public RPSL bulk data. It downloads RIPE, APNIC, and AFRINIC databases automatically, parses the data as streams, resolves organisation/contact relationships, and publishes SQLite, DuckDB, Parquet, and CSV artifacts suitable for security operations, abuse handling, risk systems, and network analytics.
 
 
-
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <img src="https://img.shields.io/badge/status-active-success" alt="Project status">
@@ -28,7 +27,7 @@ The compiler currently targets public RPSL data from:
 | Registry | Retrieval | Inputs |
 | --- | --- | --- |
 | RIPE NCC | automatic download | `inetnum`, `inet6num`, `organisation`, `role` split files |
-| APNIC | automatic download | `inetnum`, `inet6num`, `organisation`, `role` split files |
+| APNIC | automatic download | `inetnum`, `inet6num`, `organisation`, `role`, `irt` split files |
 | AFRINIC | automatic download | combined `afrinic.db.gz` |
 | LACNIC | local file | `--lacnic-db /path/to/lacnic.db` |
 | ARIN | local file flag | `--arin-xml /path/to/arin.xml`; XML parsing is intentionally not automated in this MVP |
@@ -65,12 +64,16 @@ network.org
   -> abuse-mailbox
 ```
 
-When `org` is absent, the compiler falls back to the direct operational contacts on the network object:
+When `org` is absent, the compiler falls back to APNIC IRT or direct operational contacts on the network object:
 
 ```text
+network.mnt-irt
+  -> irt
+  -> abuse-mailbox
+
 network.admin-c or network.tech-c
   -> role/person.nic-hdl
-  -> e-mail
+  -> abuse-mailbox or e-mail
 ```
 
 The parser reads RPSL paragraphs from `io.Reader`, supports gzip input, handles continuation lines, and emits typed records into the compiler pipeline. SQLite writes use prepared statements and transactions with a 50,000-row default batch size.
@@ -82,7 +85,7 @@ The parser reads RPSL paragraphs from `io.Reader`, supports gzip input, handles 
 - Automatic public bulk downloads for RIPE, APNIC, and AFRINIC.
 - Streaming RPSL parser for plain and gzip input.
 - Normalization for `inetnum`, `inet6num`, `route`, and `route6`.
-- Relational contact resolution across network, organisation, role, and person objects.
+- Relational contact resolution across network, organisation, role, person, and APNIC IRT objects.
 - SQLite output using `modernc.org/sqlite` as the compatibility baseline.
 - DuckDB output for local analytics and scan-heavy workflows.
 - Parquet output for lakehouse, object storage, and columnar ingestion pipelines.
@@ -252,7 +255,7 @@ SELECT
     n.rir,
     o.org_name,
     o.country,
-    COALESCE(c1.abuse_email, c2.tech_email) AS contact_email
+    COALESCE(NULLIF(c1.abuse_email, ''), NULLIF(c2.abuse_email, ''), NULLIF(c2.tech_email, '')) AS contact_email
 FROM networks n
 LEFT JOIN organisations o ON n.org_id = o.org_id
 LEFT JOIN contacts c1 ON o.abuse_contact_id = c1.contact_id
@@ -274,9 +277,10 @@ CSV columns:
 
 | Object | Fields |
 | --- | --- |
-| `inetnum`, `inet6num`, `route`, `route6` | `org`, `admin-c`, `tech-c` |
+| `inetnum`, `inet6num`, `route`, `route6` | `org`, `mnt-irt`, `admin-c`, `tech-c` |
 | `organisation` | `organisation`, `org-name`, `country`, `abuse-c` |
 | `role`, `person` | `nic-hdl`, `abuse-mailbox`, `e-mail` |
+| `irt` | `irt`, `abuse-mailbox`, `e-mail` |
 
 </details>
 
@@ -303,8 +307,8 @@ Tracked metrics:
 | `networks_with_org_name` | Rows resolved to an organisation name |
 | `org_name_coverage_pct` | Organisation-name saturation |
 | `abuse_mailbox_matches` | Rows resolved through `organisation.abuse-c -> abuse-mailbox` |
-| `fallback_tech_email_matches` | Rows resolved through `admin-c` / `tech-c -> e-mail` |
-| `contact_rows` | Parsed `role` and `person` contact rows |
+| `fallback_tech_email_matches` | Rows resolved through `mnt-irt`, `admin-c`, or `tech-c` fallback contacts |
+| `contact_rows` | Parsed `role`, `person`, and `irt` contact rows |
 
 Low coverage is useful signal, not hidden failure. It usually means the upstream registry objects do not expose contacts, the reference points to ARIN/LACNIC material that was not provided, or the registry data is incomplete for that range.
 

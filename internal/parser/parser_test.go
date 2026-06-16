@@ -42,6 +42,29 @@ e-mail: noc@example.net
 	}
 }
 
+func TestParseAPNICIRTContact(t *testing.T) {
+	input := `inetnum: 203.0.113.0 - 203.0.113.255
+mnt-irt: IRT-EXAMPLE-AP
+
+irt: IRT-EXAMPLE-AP
+abuse-mailbox: abuse-apnic@example.net
+e-mail: noc-apnic@example.net
+`
+	records, err := ParseAll(context.Background(), strings.NewReader(input), "APNIC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("records = %d", len(records))
+	}
+	if got := records[0].Networks[0].ContactID; got != "IRT-EXAMPLE-AP" {
+		t.Fatalf("network contact = %q", got)
+	}
+	if got := records[1].Contact.AbuseEmail; got != "abuse-apnic@example.net" {
+		t.Fatalf("irt abuse email = %q", got)
+	}
+}
+
 func TestGzipStream(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

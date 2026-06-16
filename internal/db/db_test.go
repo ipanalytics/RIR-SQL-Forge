@@ -22,6 +22,7 @@ func TestStoreFlattenAndCSV(t *testing.T) {
 	if err := store.InsertNetworks(ctx, []parser.Network{
 		{CIDR: "203.0.113.0/24", RIR: "RIPE", OrgID: "ORG-1", ContactID: "TECH-1"},
 		{CIDR: "198.51.100.0/24", RIR: "RIPE", ContactID: "TECH-1"},
+		{CIDR: "192.0.2.0/24", RIR: "APNIC", ContactID: "IRT-1"},
 	}, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -31,6 +32,7 @@ func TestStoreFlattenAndCSV(t *testing.T) {
 	if err := store.UpsertContacts(ctx, []parser.Contact{
 		{ContactID: "ABUSE-1", AbuseEmail: "abuse@example.net"},
 		{ContactID: "TECH-1", TechEmail: "noc@example.net"},
+		{ContactID: "IRT-1", AbuseEmail: "irt-abuse@example.net"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +44,7 @@ func TestStoreFlattenAndCSV(t *testing.T) {
 		t.Fatal(err)
 	}
 	csv := buf.String()
-	for _, want := range []string{"cidr,rir,org_name,country,contact_email", "abuse@example.net", "noc@example.net"} {
+	for _, want := range []string{"cidr,rir,org_name,country,contact_email", "abuse@example.net", "noc@example.net", "irt-abuse@example.net"} {
 		if !strings.Contains(csv, want) {
 			t.Fatalf("CSV missing %q:\n%s", want, csv)
 		}
@@ -51,7 +53,7 @@ func TestStoreFlattenAndCSV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stats.TotalNetworks != 2 || stats.NetworksWithEmail != 2 || stats.EmailCoveragePct != 100 {
+	if stats.TotalNetworks != 3 || stats.NetworksWithEmail != 3 || stats.EmailCoveragePct != 100 || stats.FallbackTechMatches != 2 {
 		t.Fatalf("unexpected stats: %#v", stats)
 	}
 }

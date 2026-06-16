@@ -11,7 +11,7 @@ func TestPublicSources(t *testing.T) {
 		"https://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz",
 		"https://ftp.ripe.net/ripe/dbase/split/ripe.db.person.gz",
 		"https://ftp.apnic.net/apnic/whois/apnic.db.organisation.gz",
-		"https://ftp.apnic.net/apnic/whois/apnic.db.person.gz",
+		"https://ftp.apnic.net/apnic/whois/apnic.db.irt.gz",
 		"https://ftp.afrinic.net/pub/dbase/afrinic.db.gz",
 	}
 	for _, url := range want {
