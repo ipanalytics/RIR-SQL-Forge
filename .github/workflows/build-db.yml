@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-rir-database
+  cancel-in-progress: false
+
 jobs:
   build-db:
     runs-on: ubuntu-latest
@@ -20,6 +24,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Remove stale same-day release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG="db-$(date -u +%F)"
+          gh release delete "$RELEASE_TAG" --yes --cleanup-tag || true
 
       - name: Test
         run: go test ./...
@@ -45,6 +56,33 @@ jobs:
             cat dist/net_owner_directory.stats.md
           } > release-notes.md
 
+      - name: Update README dataset stats
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path("README.md")
+          stats = Path("dist/net_owner_directory.stats.md").read_text()
+          text = readme.read_text()
+          start = "<!-- DATASET_STATS_START -->"
+          end = "<!-- DATASET_STATS_END -->"
+          before, rest = text.split(start, 1)
+          _, after = rest.split(end, 1)
+          readme.write_text(before + start + "\n" + stats.rstrip() + "\n" + end + after)
+          PY
+
+      - name: Commit README dataset stats
+        run: |
+          if git diff --quiet README.md; then
+            echo "README dataset stats already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update dataset saturation stats"
+          git push
+
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -59,7 +97,7 @@ jobs:
             dist/net_owner_directory.stats.md \
             --title "$RELEASE_TAG" \
             --notes-file release-notes.md \
-            --latest=false \
+            --latest \
           || gh release upload "$RELEASE_TAG" \
             net_owner_directory.sqlite.gz \
             net_owner_directory.csv.gz \
@@ -68,3 +106,7 @@ jobs:
             dist/net_owner_directory.stats.json \
             dist/net_owner_directory.stats.md \
             --clobber
+          gh release edit "$RELEASE_TAG" \
+            --title "$RELEASE_TAG" \
+            --notes-file release-notes.md \
+            --latest
