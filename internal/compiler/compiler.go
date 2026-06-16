@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ipanalytics/rir-sql-forge/internal/artifacts"
 	"github.com/ipanalytics/rir-sql-forge/internal/db"
 	"github.com/ipanalytics/rir-sql-forge/internal/downloader"
 	"github.com/ipanalytics/rir-sql-forge/internal/parser"
@@ -34,7 +35,7 @@ type Options struct {
 	LocalSources   []LocalSource
 }
 
-// Compile builds SQLite and CSV outputs from public or local RPSL sources.
+// Compile builds SQLite, DuckDB, Parquet, and CSV outputs from public or local RPSL sources.
 func Compile(ctx context.Context, opts Options, log io.Writer) error {
 	opts = opts.withDefaults()
 	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
@@ -50,6 +51,10 @@ func Compile(ctx context.Context, opts Options, log io.Writer) error {
 	}
 	sqlitePath := filepath.Join(opts.OutputDir, "net_owner_directory.sqlite")
 	csvPath := filepath.Join(opts.OutputDir, "net_owner_directory.csv")
+	duckdbPath := filepath.Join(opts.OutputDir, "net_owner_directory.duckdb")
+	parquetPath := filepath.Join(opts.OutputDir, "net_owner_directory.parquet")
+	statsJSONPath := filepath.Join(opts.OutputDir, "net_owner_directory.stats.json")
+	statsMarkdownPath := filepath.Join(opts.OutputDir, "net_owner_directory.stats.md")
 	_ = os.Remove(sqlitePath)
 
 	store, err := db.Open(sqlitePath)
@@ -70,8 +75,27 @@ func Compile(ctx context.Context, opts Options, log io.Writer) error {
 	if err := store.ExportCSV(ctx, csvPath); err != nil {
 		return err
 	}
+	stats, err := store.ExportStats(ctx, statsJSONPath, statsMarkdownPath)
+	if err != nil {
+		return err
+	}
+	flatRows, err := store.FlatRows(ctx)
+	if err != nil {
+		return err
+	}
+	if err := artifacts.ExportDuckDB(ctx, duckdbPath, flatRows); err != nil {
+		return err
+	}
+	if err := artifacts.ExportParquet(parquetPath, flatRows); err != nil {
+		return err
+	}
 	fmt.Fprintf(log, "wrote %s\n", sqlitePath)
 	fmt.Fprintf(log, "wrote %s\n", csvPath)
+	fmt.Fprintf(log, "wrote %s\n", duckdbPath)
+	fmt.Fprintf(log, "wrote %s\n", parquetPath)
+	fmt.Fprintf(log, "wrote %s\n", statsJSONPath)
+	fmt.Fprintf(log, "wrote %s\n", statsMarkdownPath)
+	fmt.Fprintf(log, "coverage: %.2f%% rows with contact email (%d/%d)\n", stats.EmailCoveragePct, stats.NetworksWithEmail, stats.TotalNetworks)
 	return nil
 }
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -16,6 +18,32 @@ const defaultBatchSize = 50000
 // Store wraps a SQLite database used by the compiler.
 type Store struct {
 	db *sql.DB
+}
+
+// DirectoryRow is one flattened ownership/contact row.
+type DirectoryRow struct {
+	CIDR         string `parquet:"cidr,zstd"`
+	RIR          string `parquet:"rir,zstd"`
+	OrgName      string `parquet:"org_name,zstd"`
+	Country      string `parquet:"country,zstd"`
+	ContactEmail string `parquet:"contact_email,zstd"`
+}
+
+// Stats describes dataset saturation and join quality.
+type Stats struct {
+	TotalNetworks         int64   `json:"total_networks"`
+	NetworksWithOrgName   int64   `json:"networks_with_org_name"`
+	NetworksWithCountry   int64   `json:"networks_with_country"`
+	NetworksWithEmail     int64   `json:"networks_with_email"`
+	NetworksWithoutEmail  int64   `json:"networks_without_email"`
+	OrgNameCoveragePct    float64 `json:"org_name_coverage_pct"`
+	CountryCoveragePct    float64 `json:"country_coverage_pct"`
+	EmailCoveragePct      float64 `json:"email_coverage_pct"`
+	AbuseMailboxMatches   int64   `json:"abuse_mailbox_matches"`
+	FallbackTechMatches   int64   `json:"fallback_tech_email_matches"`
+	NormalisedNetworkRows int64   `json:"normalised_network_rows"`
+	OrganisationRows      int64   `json:"organisation_rows"`
+	ContactRows           int64   `json:"contact_rows"`
 }
 
 // Open opens or creates a SQLite store at path.
@@ -122,9 +150,128 @@ func (s *Store) ExportCSV(ctx context.Context, path string) error {
 	return s.WriteCSV(ctx, file)
 }
 
+// ExportStats writes machine-readable and Markdown dataset saturation reports.
+func (s *Store) ExportStats(ctx context.Context, jsonPath, markdownPath string) (Stats, error) {
+	stats, err := s.Stats(ctx)
+	if err != nil {
+		return Stats{}, err
+	}
+	body, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		return Stats{}, err
+	}
+	body = append(body, '\n')
+	if err := os.WriteFile(jsonPath, body, 0o644); err != nil {
+		return Stats{}, err
+	}
+	if err := os.WriteFile(markdownPath, []byte(stats.Markdown()), 0o644); err != nil {
+		return Stats{}, err
+	}
+	return stats, nil
+}
+
+// Stats calculates dataset saturation from normalized and flattened tables.
+func (s *Store) Stats(ctx context.Context) (Stats, error) {
+	var stats Stats
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM networks`).Scan(&stats.NormalisedNetworkRows); err != nil {
+		return Stats{}, err
+	}
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM organisations`).Scan(&stats.OrganisationRows); err != nil {
+		return Stats{}, err
+	}
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM contacts`).Scan(&stats.ContactRows); err != nil {
+		return Stats{}, err
+	}
+	row := s.db.QueryRowContext(ctx, `SELECT
+		COUNT(*),
+		COALESCE(SUM(CASE WHEN org_name IS NOT NULL AND org_name <> '' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN country IS NOT NULL AND country <> '' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN contact_email IS NOT NULL AND contact_email <> '' THEN 1 ELSE 0 END), 0)
+	FROM ip_owner_abuse_directory`)
+	if err := row.Scan(&stats.TotalNetworks, &stats.NetworksWithOrgName, &stats.NetworksWithCountry, &stats.NetworksWithEmail); err != nil {
+		return Stats{}, err
+	}
+	stats.NetworksWithoutEmail = stats.TotalNetworks - stats.NetworksWithEmail
+	stats.OrgNameCoveragePct = percentage(stats.NetworksWithOrgName, stats.TotalNetworks)
+	stats.CountryCoveragePct = percentage(stats.NetworksWithCountry, stats.TotalNetworks)
+	stats.EmailCoveragePct = percentage(stats.NetworksWithEmail, stats.TotalNetworks)
+
+	matchRow := s.db.QueryRowContext(ctx, `SELECT
+		COALESCE(SUM(CASE WHEN c1.abuse_email IS NOT NULL AND c1.abuse_email <> '' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN (c1.abuse_email IS NULL OR c1.abuse_email = '') AND c2.tech_email IS NOT NULL AND c2.tech_email <> '' THEN 1 ELSE 0 END), 0)
+	FROM networks n
+	LEFT JOIN organisations o ON n.org_id = o.org_id
+	LEFT JOIN contacts c1 ON o.abuse_contact_id = c1.contact_id
+	LEFT JOIN contacts c2 ON n.contact_id = c2.contact_id`)
+	if err := matchRow.Scan(&stats.AbuseMailboxMatches, &stats.FallbackTechMatches); err != nil {
+		return Stats{}, err
+	}
+	return stats, nil
+}
+
+// Markdown renders a concise release-ready saturation report.
+func (s Stats) Markdown() string {
+	return fmt.Sprintf(`# Dataset saturation
+
+| Metric | Value |
+| --- | ---: |
+| Total network rows | %d |
+| Rows with contact email | %d |
+| Rows without contact email | %d |
+| Email coverage | %.2f%% |
+| Rows with organisation name | %d |
+| Organisation coverage | %.2f%% |
+| Rows with country | %d |
+| Country coverage | %.2f%% |
+| Abuse mailbox matches | %d |
+| Fallback tech/admin email matches | %d |
+| Normalized network rows | %d |
+| Organisation rows | %d |
+| Contact rows | %d |
+
+Low contact coverage usually means the upstream RPSL objects do not expose an abuse mailbox or the contact reference points to a restricted/manual registry source.
+`,
+		s.TotalNetworks,
+		s.NetworksWithEmail,
+		s.NetworksWithoutEmail,
+		s.EmailCoveragePct,
+		s.NetworksWithOrgName,
+		s.OrgNameCoveragePct,
+		s.NetworksWithCountry,
+		s.CountryCoveragePct,
+		s.AbuseMailboxMatches,
+		s.FallbackTechMatches,
+		s.NormalisedNetworkRows,
+		s.OrganisationRows,
+		s.ContactRows,
+	)
+}
+
+// FlatRows returns the flattened directory rows in deterministic order.
+func (s *Store) FlatRows(ctx context.Context) ([]DirectoryRow, error) {
+	rows, err := s.queryFlatRows(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []DirectoryRow
+	for rows.Next() {
+		row, err := scanDirectoryRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WriteCSV writes the flattened table as CSV to w.
 func (s *Store) WriteCSV(ctx context.Context, w io.Writer) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT cidr, rir, org_name, country, contact_email FROM ip_owner_abuse_directory ORDER BY cidr, rir`)
+	rows, err := s.queryFlatRows(ctx)
 	if err != nil {
 		return err
 	}
@@ -134,11 +281,11 @@ func (s *Store) WriteCSV(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	for rows.Next() {
-		var cidr, rir, orgName, country, email sql.NullString
-		if err := rows.Scan(&cidr, &rir, &orgName, &country, &email); err != nil {
+		row, err := scanDirectoryRow(rows)
+		if err != nil {
 			return err
 		}
-		if err := cw.Write([]string{cidr.String, rir.String, orgName.String, country.String, email.String}); err != nil {
+		if err := cw.Write([]string{row.CIDR, row.RIR, row.OrgName, row.Country, row.ContactEmail}); err != nil {
 			return err
 		}
 	}
@@ -147,6 +294,31 @@ func (s *Store) WriteCSV(ctx context.Context, w io.Writer) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func (s *Store) queryFlatRows(ctx context.Context) (*sql.Rows, error) {
+	return s.db.QueryContext(ctx, `SELECT cidr, rir, org_name, country, contact_email FROM ip_owner_abuse_directory ORDER BY cidr, rir`)
+}
+
+func scanDirectoryRow(rows *sql.Rows) (DirectoryRow, error) {
+	var cidr, rir, orgName, country, email sql.NullString
+	if err := rows.Scan(&cidr, &rir, &orgName, &country, &email); err != nil {
+		return DirectoryRow{}, err
+	}
+	return DirectoryRow{
+		CIDR:         cidr.String,
+		RIR:          rir.String,
+		OrgName:      orgName.String,
+		Country:      country.String,
+		ContactEmail: email.String,
+	}, nil
+}
+
+func percentage(part, total int64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(part) * 100 / float64(total)
 }
 
 func (s *Store) withTx(ctx context.Context, fn func(*sql.Tx) error) error {

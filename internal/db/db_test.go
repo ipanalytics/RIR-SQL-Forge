@@ -47,4 +47,11 @@ func TestStoreFlattenAndCSV(t *testing.T) {
 			t.Fatalf("CSV missing %q:\n%s", want, csv)
 		}
 	}
+	stats, err := store.Stats(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.TotalNetworks != 2 || stats.NetworksWithEmail != 2 || stats.EmailCoveragePct != 100 {
+		t.Fatalf("unexpected stats: %#v", stats)
+	}
 }

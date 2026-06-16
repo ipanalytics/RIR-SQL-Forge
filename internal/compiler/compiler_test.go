@@ -53,11 +53,34 @@ e-mail: noc@example.net
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, artifact := range []string{
+		"net_owner_directory.sqlite",
+		"net_owner_directory.csv",
+		"net_owner_directory.duckdb",
+		"net_owner_directory.parquet",
+		"net_owner_directory.stats.json",
+		"net_owner_directory.stats.md",
+	} {
+		stat, err := os.Stat(filepath.Join(dir, "out", artifact))
+		if err != nil {
+			t.Fatalf("%s missing: %v", artifact, err)
+		}
+		if stat.Size() == 0 {
+			t.Fatalf("%s is empty", artifact)
+		}
+	}
 	csv := string(body)
 	for _, want := range []string{"abuse@example.net", "noc@example.net", "192.0.2.0/24,RIPE,,,"} {
 		if !strings.Contains(csv, want) {
 			t.Fatalf("CSV missing %q:\n%s", want, csv)
 		}
+	}
+	statsBody, err := os.ReadFile(filepath.Join(dir, "out", "net_owner_directory.stats.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(statsBody), "Email coverage") || !strings.Contains(log.String(), "coverage:") {
+		t.Fatalf("stats report/log missing coverage:\nstats=%s\nlog=%s", string(statsBody), log.String())
 	}
 	if !strings.Contains(log.String(), "ARIN XML path not provided; skipping ARIN") || !strings.Contains(log.String(), "LACNIC bulk path not provided; skipping LACNIC") {
 		t.Fatalf("manual source skip logs missing:\n%s", log.String())

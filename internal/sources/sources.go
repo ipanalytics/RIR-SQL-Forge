@@ -20,6 +20,7 @@ func Public(includeRIPE, includeAPNIC, includeAFRINIC bool) []Source {
 			Source{RIR: "RIPE", ObjectHint: "inet6num", URL: "https://ftp.ripe.net/ripe/dbase/split/ripe.db.inet6num.gz", Gzip: true},
 			Source{RIR: "RIPE", ObjectHint: "organisation", URL: "https://ftp.ripe.net/ripe/dbase/split/ripe.db.organisation.gz", Gzip: true},
 			Source{RIR: "RIPE", ObjectHint: "role", URL: "https://ftp.ripe.net/ripe/dbase/split/ripe.db.role.gz", Gzip: true},
+			Source{RIR: "RIPE", ObjectHint: "person", URL: "https://ftp.ripe.net/ripe/dbase/split/ripe.db.person.gz", Gzip: true},
 		)
 	}
 	if includeAPNIC {
@@ -28,6 +29,7 @@ func Public(includeRIPE, includeAPNIC, includeAFRINIC bool) []Source {
 			Source{RIR: "APNIC", ObjectHint: "inet6num", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.inet6num.gz", Gzip: true},
 			Source{RIR: "APNIC", ObjectHint: "organisation", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.organisation.gz", Gzip: true},
 			Source{RIR: "APNIC", ObjectHint: "role", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.role.gz", Gzip: true},
+			Source{RIR: "APNIC", ObjectHint: "person", URL: "https://ftp.apnic.net/apnic/whois/apnic.db.person.gz", Gzip: true},
 		)
 	}
 	if includeAFRINIC {
