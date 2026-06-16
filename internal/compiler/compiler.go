@@ -116,10 +116,12 @@ func prepareSources(ctx context.Context, opts Options, log io.Writer) ([]sources
 
 	client := downloader.Client{}
 	for _, src := range sources.Public(opts.IncludeRIPE, opts.IncludeAPNIC, opts.IncludeAFRINIC) {
+		fmt.Fprintf(log, "downloading %s %s from %s\n", src.RIR, src.ObjectHint, src.URL)
 		downloaded, err := client.Download(ctx, opts.WorkDir, src)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Fprintf(log, "downloaded %s %s to %s\n", downloaded.RIR, downloaded.ObjectHint, downloaded.LocalPath)
 		sourceList = append(sourceList, downloaded)
 	}
 	return sourceList, nil

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ipanalytics/rir-sql-forge/internal/sources"
 )
@@ -30,7 +31,7 @@ func (c Client) Download(ctx context.Context, tempDir string, src sources.Source
 	}
 	httpClient := c.HTTPClient
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{Timeout: 30 * time.Minute}
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
