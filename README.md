@@ -323,19 +323,19 @@ This block is updated by the release workflow after a successful dataset build.
 
 | Metric | Value |
 | --- | ---: |
-| Total network rows | 7023184 |
-| Rows with contact email | 1779216 |
-| Rows without contact email | 5243968 |
-| Email coverage | 25.33% |
-| Rows with organisation name | 570698 |
+| Total network rows | 7029056 |
+| Rows with contact email | 1778117 |
+| Rows without contact email | 5250939 |
+| Email coverage | 25.30% |
+| Rows with organisation name | 571467 |
 | Organisation coverage | 8.13% |
-| Rows with country | 400870 |
-| Country coverage | 5.71% |
-| Abuse mailbox matches | 452939 |
-| Fallback tech/admin email matches | 1326277 |
-| Normalized network rows | 7023184 |
-| Organisation rows | 118391 |
-| Contact rows | 216572 |
+| Rows with country | 401988 |
+| Country coverage | 5.72% |
+| Abuse mailbox matches | 451195 |
+| Fallback tech/admin email matches | 1326922 |
+| Normalized network rows | 7029056 |
+| Organisation rows | 120588 |
+| Contact rows | 218920 |
 
 Low contact coverage usually means the upstream RPSL objects do not expose an abuse mailbox or the contact reference points to a restricted/manual registry source.
 <!-- DATASET_STATS_END -->
